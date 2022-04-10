@@ -19,6 +19,7 @@
     "yeoman-generator"
   ],
   "devDependencies": {
+    "@types/axios": "^0.14.0",
     "@types/yeoman-generator": "^5.2.10",
     "@types/yosay": "^2.0.1",
     "eslint": "^6.6.0",

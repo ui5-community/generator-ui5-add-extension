@@ -112,10 +112,11 @@ export class App extends Generator {
   }
 
   public async writing() {
-    this.fs.copy(
-      this.templatePath("dummyfile.txt"),
-      this.destinationPath("dummyfile.txt")
-    );
+    // this.fs.copy(
+    //   this.templatePath("dummyfile.txt"),
+    //   this.destinationPath("dummyfile.txt")
+    // );
+    console.log(this.props);
   }
 
   // public async install() {

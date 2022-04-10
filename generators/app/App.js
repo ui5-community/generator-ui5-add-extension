@@ -29,7 +29,7 @@ class App extends Generator {
         });
         //create a txt file with the extension config
         ui5Model.packages.forEach(ui5Ext => {
-            this.fs.write(`./templates/${ui5Ext.name}.txt`, `${ui5Ext.readme}`);
+            this.fs.write(`.generators/app/templates/${ui5Ext.name}.txt`, `${ui5Ext.readme}`);
         });
     }
     async prompting() {
@@ -64,7 +64,11 @@ class App extends Generator {
         });
     }
     async writing() {
-        this.fs.copy(this.templatePath("dummyfile.txt"), this.destinationPath("dummyfile.txt"));
+        // this.fs.copy(
+        //   this.templatePath("dummyfile.txt"),
+        //   this.destinationPath("dummyfile.txt")
+        // );
+        console.log(this.props);
     }
 }
 exports.App = App;
