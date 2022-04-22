@@ -45,7 +45,7 @@ export class App extends Generator {
     super(args, opts);
   }
   public async initializing() {
-    const data = await axios("https://ui5-community.github.io/model/data.json");
+    const data = await axios("https://bestofui5.org/model/data.json");
     const ui5Model: IUI5Model = data.data;
     this.types = ui5Model.types;
     this.packages = ui5Model.packages;
