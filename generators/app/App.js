@@ -51,21 +51,24 @@ class App extends Generator {
                 name: "ExtensionType",
                 message: "Which extension type would you like to add?",
                 choices: ["Middleware", "Task"],
-                default: ["Middleware"]
+                default: ["Middleware"],
+                store: true
             },
             {
                 type: "checkbox",
                 name: "ExtensionsMiddleware",
                 message: "Choose your middleware extensions?",
                 when: (response) => response.ExtensionType.includes("Middleware"),
-                choices: [...this.middlewares]
+                choices: [...this.middlewares],
+                store: true
             },
             {
                 type: "checkbox",
                 name: "ExtensionsTasks",
                 message: "Choose your task extensions?",
                 when: (response) => response.ExtensionType.includes("Task"),
-                choices: [...this.tasks]
+                choices: [...this.tasks],
+                store: true
             }
         ];
         this.middlewares.forEach((ui5Ext) => {
@@ -97,6 +100,7 @@ class App extends Generator {
                     type: param.type === "boolean" ? "confirm" : "input",
                     name: `${ui5Ext.name}_${param.name}`,
                     message: `Add variable '${param.name}' for ${ui5Ext.name}`,
+                    store: true,
                     when: (response) => response.ExtensionsMiddleware.includes(`${ui5Ext.name} - ${ui5Ext.description}`)
                 };
             });
