@@ -13,7 +13,7 @@ class App extends Generator {
         super(args, opts);
     }
     async initializing() {
-        const data = await (0, axios_1.default)("https://ui5-community.github.io/model/data.json");
+        const data = await (0, axios_1.default)("https://bestofui5.org/model/data.json");
         const ui5Model = data.data;
         this.types = ui5Model.types;
         this.packages = ui5Model.packages;
@@ -35,7 +35,17 @@ class App extends Generator {
     async prompting() {
         // Have Yeoman greet the user.
         this.log((0, yosay_1.default)(`Hello, let me help you get sorted with your ${chalk_1.default.red("ui5-tooling")}`));
-        const prompts = [
+        return this._getExtensions();
+    }
+    async writing() {
+        // this.fs.copy(
+        //   this.templatePath("dummyfile.txt"),
+        //   this.destinationPath("dummyfile.txt")
+        // );
+        console.log(this.props);
+    }
+    _getExtensions() {
+        let prompts = [
             {
                 type: "checkbox",
                 name: "ExtensionType",
@@ -58,17 +68,43 @@ class App extends Generator {
                 choices: [...this.tasks]
             }
         ];
+        this.middlewares.forEach((ui5Ext) => {
+            const newVarPrompt = this._addVariables(ui5Ext, "middleware");
+            if (newVarPrompt) {
+                newVarPrompt.forEach((prompt) => {
+                    prompts.push(prompt);
+                });
+            }
+        });
+        this.tasks.forEach((ui5Ext) => {
+            const newVarPrompt = this._addVariables(ui5Ext, "tasks");
+            if (newVarPrompt) {
+                newVarPrompt.forEach((prompt) => {
+                    prompts.push(prompt);
+                });
+            }
+        });
         return this.prompt(prompts).then((props) => {
             // To access props later use this.props.someAnswer;
             this.props = props;
         });
     }
-    async writing() {
-        // this.fs.copy(
-        //   this.templatePath("dummyfile.txt"),
-        //   this.destinationPath("dummyfile.txt")
-        // );
-        console.log(this.props);
+    _addVariables(ui5Package, type) {
+        const ui5Ext = this.packages.find((ui5Ext1) => ui5Ext1.name === ui5Package.split(" - ")[0]);
+        if (ui5Ext.jsdoc[type]) {
+            const prompts = ui5Ext.jsdoc[type].params.map((param) => {
+                return {
+                    type: param.type === "boolean" ? "confirm" : "input",
+                    name: `${ui5Ext.name}_${param.name}`,
+                    message: `Add variable '${param.name}' for ${ui5Ext.name}`,
+                    when: (response) => response.ExtensionsMiddleware.includes(`${ui5Ext.name} - ${ui5Ext.description}`)
+                };
+            });
+            return prompts;
+        }
+        else {
+            return;
+        }
     }
 }
 exports.App = App;

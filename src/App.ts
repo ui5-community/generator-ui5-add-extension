@@ -11,6 +11,7 @@ interface IGitRepo {
 }
 
 interface IPackage {
+  jsdoc: any;
   name: string;
   version: string;
   description: string;
@@ -79,7 +80,19 @@ export class App extends Generator {
       )
     );
 
-    const prompts = [
+    return this._getExtensions();
+  }
+
+  public async writing() {
+    // this.fs.copy(
+    //   this.templatePath("dummyfile.txt"),
+    //   this.destinationPath("dummyfile.txt")
+    // );
+    console.log(this.props);
+  }
+
+  private _getExtensions() {
+    let prompts = [
       {
         type: "checkbox",
         name: "ExtensionType",
@@ -104,22 +117,61 @@ export class App extends Generator {
         choices: [...this.tasks]
       }
     ];
+    this.middlewares.forEach((ui5Ext: string) => {
+      const newVarPrompt: Array<object> | undefined = this._addVariables(
+        ui5Ext,
+        "middleware"
+      );
+      if (newVarPrompt) {
+        newVarPrompt.forEach((prompt: any) => {
+          prompts.push(prompt);
+        });
+      }
+    });
+
+    this.tasks.forEach((ui5Ext: string) => {
+      const newVarPrompt: Array<object> | undefined = this._addVariables(
+        ui5Ext,
+        "tasks"
+      );
+      if (newVarPrompt) {
+        newVarPrompt.forEach((prompt: any) => {
+          prompts.push(prompt);
+        });
+      }
+    });
 
     return this.prompt(prompts).then((props: any) => {
       // To access props later use this.props.someAnswer;
+
       this.props = props;
     });
   }
 
-  public async writing() {
-    // this.fs.copy(
-    //   this.templatePath("dummyfile.txt"),
-    //   this.destinationPath("dummyfile.txt")
-    // );
-    console.log(this.props);
-  }
+  private _addVariables(ui5Package: string, type: string) {
+    const ui5Ext = this.packages.find(
+      (ui5Ext1: { name: string }) => ui5Ext1.name === ui5Package.split(" - ")[0]
+    );
+    if (ui5Ext.jsdoc[type]) {
+      const prompts = ui5Ext.jsdoc[type].params.map((param: any) => {
+        return {
+          type: param.type === "boolean" ? "confirm" : "input",
+          name: `${ui5Ext.name}_${param.name}`,
+          message: `Add variable '${param.name}' for ${ui5Ext.name}`,
+          when: (response: { ExtensionsMiddleware: string | string[] }) =>
+            response.ExtensionsMiddleware.includes(
+              `${ui5Ext.name} - ${ui5Ext.description}`
+            )
+        };
+      });
 
-  // public async install() {
-  //   this.installDependencies();
-  // }
+      return prompts;
+    } else {
+      return;
+    }
+  }
 }
+
+// public async install() {
+//   this.installDependencies();
+// }
