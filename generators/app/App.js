@@ -8,12 +8,13 @@ const Generator = require("yeoman-generator");
 const chalk_1 = __importDefault(require("chalk"));
 const yosay_1 = __importDefault(require("yosay"));
 const axios_1 = __importDefault(require("axios"));
+const js_yaml_1 = require("js-yaml");
 class App extends Generator {
     constructor(args, opts) {
         super(args, opts);
     }
     async initializing() {
-        const data = await (0, axios_1.default)("https://bestofui5.org/model/data.json");
+        const data = await (0, axios_1.default)("https://raw.githubusercontent.com/ui5-community/bestofui5-data/live-data/data/data.json");
         const ui5Model = data.data;
         this.types = ui5Model.types;
         this.packages = ui5Model.packages;
@@ -27,10 +28,6 @@ class App extends Generator {
             .map(ui5Ext => {
             return `${ui5Ext.name} - ${ui5Ext.description}`;
         });
-        //create a txt file with the extension config
-        ui5Model.packages.forEach(ui5Ext => {
-            this.fs.write(`.generators/app/templates/${ui5Ext.name}.txt`, `${ui5Ext.readme}`);
-        });
     }
     async prompting() {
         // Have Yeoman greet the user.
@@ -42,7 +39,50 @@ class App extends Generator {
         //   this.templatePath("dummyfile.txt"),
         //   this.destinationPath("dummyfile.txt")
         // );
-        console.log(this.props);
+        var ui5Yaml = (0, js_yaml_1.load)(this.fs.read(this.destinationPath("ui5.yaml")));
+        const regName = /^.*(?=( - ))/;
+        if (this.props.ExtensionsMiddleware) {
+            const PromMiddleware = new Promise((resolve, reject) => {
+                this.props.ExtensionsMiddleware.forEach(async (ui5Ext) => {
+                    let dependency = {};
+                    const name = ui5Ext.match(regName)[0];
+                    dependency[name] = "latest";
+                    await this.addDevDependencies(dependency);
+                    if (!ui5Yaml.server || !ui5Yaml.server.customMiddleware) {
+                        ui5Yaml["server"] = {
+                            customMiddleware: []
+                        };
+                    }
+                    const middlewareConf = {
+                        name: name,
+                        afterMiddleware: "compression",
+                        configuration: {}
+                    };
+                    const regVars = new RegExp(`(?<=${name}_).*$`);
+                    const vars = Object.keys(this.props).filter((prop) => prop.match(regVars));
+                    vars.forEach((varName) => {
+                        middlewareConf.configuration[regVars.exec(varName)[0]] = this.props[varName];
+                    });
+                    if (middlewareConf && ui5Yaml.server.customMiddleware) {
+                        ui5Yaml.server.customMiddleware.push(middlewareConf);
+                    }
+                    // Get all the middleware config params and add to the yaml file
+                    // ui5Yaml.server.customMiddleware.push({
+                });
+                resolve();
+            });
+            await PromMiddleware;
+            const newYaml = (0, js_yaml_1.dump)(ui5Yaml);
+            console.log(newYaml);
+            this.fs.write(this.destinationPath("ui5.yaml"), newYaml);
+        }
+        if (this.props.ExtensionsTasks) {
+            this.props.ExtensionsTasks.forEach(async (ui5Ext) => {
+                let dependency = {};
+                dependency[ui5Ext.split(" - ")[0]] = "latest";
+                await this.addDevDependencies(dependency);
+            });
+        }
     }
     _getExtensions() {
         let prompts = [
@@ -97,7 +137,7 @@ class App extends Generator {
         if (ui5Ext.jsdoc[type]) {
             const prompts = ui5Ext.jsdoc[type].params.map((param) => {
                 return {
-                    type: param.type === "boolean" ? "confirm" : "input",
+                    type: param.type,
                     name: `${ui5Ext.name}_${param.name}`,
                     message: `Add variable '${param.name}' for ${ui5Ext.name}`,
                     store: true,

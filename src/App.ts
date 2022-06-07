@@ -3,11 +3,26 @@ import Generator = require("yeoman-generator");
 import chalk from "chalk";
 import yosay from "yosay";
 import axios from "axios";
-import inquirer, { Inquirer } from "inquirer";
+import { load, dump } from "js-yaml";
 interface IGitRepo {
   type: string;
   url: string;
   directory: string;
+}
+
+interface IUi5Yaml {
+  specVersion: string;
+  metadata: {
+    name: string;
+  };
+  resources: any;
+  type: string;
+  server?: {
+    customMiddleware?: any[];
+  };
+  builder?: {
+    customTasks: any[];
+  };
 }
 
 interface IPackage {
@@ -32,6 +47,11 @@ interface IUI5Model {
   packages: IPackage[];
 }
 
+interface IVarProp {
+  name: string;
+  value: string;
+}
+
 interface IGeneratorOptions {
   name: string;
   description: string;
@@ -46,7 +66,9 @@ export class App extends Generator {
     super(args, opts);
   }
   public async initializing() {
-    const data = await axios("https://bestofui5.org/model/data.json");
+    const data = await axios(
+      "https://raw.githubusercontent.com/ui5-community/bestofui5-data/live-data/data/data.json"
+    );
     const ui5Model: IUI5Model = data.data;
     this.types = ui5Model.types;
     this.packages = ui5Model.packages;
@@ -60,14 +82,6 @@ export class App extends Generator {
       .map(ui5Ext => {
         return `${ui5Ext.name} - ${ui5Ext.description}`;
       });
-
-    //create a txt file with the extension config
-    ui5Model.packages.forEach(ui5Ext => {
-      this.fs.write(
-        `.generators/app/templates/${ui5Ext.name}.txt`,
-        `${ui5Ext.readme}`
-      );
-    });
   }
 
   public async prompting() {
@@ -88,7 +102,63 @@ export class App extends Generator {
     //   this.templatePath("dummyfile.txt"),
     //   this.destinationPath("dummyfile.txt")
     // );
-    console.log(this.props);
+
+    var ui5Yaml = load(
+      this.fs.read(this.destinationPath("ui5.yaml"))
+    ) as IUi5Yaml;
+    const regName = /^.*(?=( - ))/;
+    if (this.props.ExtensionsMiddleware) {
+      const PromMiddleware = new Promise<void>((resolve, reject) => {
+        this.props.ExtensionsMiddleware.forEach(async (ui5Ext: string) => {
+          let dependency = {} as any;
+          const name = ui5Ext.match(regName)![0];
+          dependency[name] = "latest";
+          await this.addDevDependencies(dependency);
+          if (!ui5Yaml.server || !ui5Yaml.server.customMiddleware) {
+            ui5Yaml["server"] = {
+              customMiddleware: []
+            };
+          }
+          const middlewareConf: any = {
+            name: name,
+            afterMiddleware: "compression",
+            configuration: {}
+          };
+          const regVars = new RegExp(`(?<=${name}_).*$`);
+          const vars = Object.keys(this.props).filter((prop: string) =>
+            prop.match(regVars)
+          );
+          vars.forEach((varName: string) => {
+            middlewareConf.configuration[
+              regVars.exec(varName)![0]
+            ] = this.props[varName];
+          });
+
+          if (middlewareConf && ui5Yaml.server.customMiddleware) {
+            ui5Yaml.server.customMiddleware.push(middlewareConf!);
+          }
+
+          // Get all the middleware config params and add to the yaml file
+          // ui5Yaml.server.customMiddleware.push({
+        });
+        resolve();
+      });
+
+      await PromMiddleware;
+
+      const newYaml = dump(ui5Yaml);
+
+      console.log(newYaml);
+      this.fs.write(this.destinationPath("ui5.yaml"), newYaml);
+    }
+
+    if (this.props.ExtensionsTasks) {
+      this.props.ExtensionsTasks.forEach(async (ui5Ext: string) => {
+        let dependency = {} as any;
+        dependency[ui5Ext.split(" - ")[0]] = "latest";
+        await this.addDevDependencies(dependency);
+      });
+    }
   }
 
   private _getExtensions() {
@@ -158,7 +228,7 @@ export class App extends Generator {
     if (ui5Ext.jsdoc[type]) {
       const prompts = ui5Ext.jsdoc[type].params.map((param: any) => {
         return {
-          type: param.type === "boolean" ? "confirm" : "input",
+          type: param.type,
           name: `${ui5Ext.name}_${param.name}`,
           message: `Add variable '${param.name}' for ${ui5Ext.name}`,
           store: true,
@@ -175,7 +245,3 @@ export class App extends Generator {
     }
   }
 }
-
-// public async install() {
-//   this.installDependencies();
-// }
