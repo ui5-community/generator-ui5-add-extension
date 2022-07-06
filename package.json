@@ -1,6 +1,6 @@
 {
   "name": "generator-ui5-add",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "A Yeoman generator to easily add assets to your UI5 project",
   "homepage": "",
   "author": {
