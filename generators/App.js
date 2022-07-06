@@ -74,7 +74,7 @@ class App extends Generator {
     }
     async prompting() {
         // Have Yeoman greet the user.
-        this.log((0, yosay_1.default)(`H1232ello, let me help you get sorted with your ${chalk_1.default.red("ui5-tooling")}
+        this.log((0, yosay_1.default)(`Hello, let me help you get sorted with your ${chalk_1.default.red("ui5-tooling")}
           data is from ${chalk_1.default.green("https://bestofui5.org")}`));
         return this._getExtensions();
     }

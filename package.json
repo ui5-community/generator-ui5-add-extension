@@ -10,7 +10,6 @@
   "files": [
     "generators"
   ],
-  "type": "module",
   "main": "generators/index.js",
   "keywords": [
     "ui5",
