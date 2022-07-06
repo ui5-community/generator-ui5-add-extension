@@ -319,7 +319,7 @@ class App extends Generator {
             const regVars = new RegExp(`(?<=${name}_)(?!.*ENV).*$`);
             const regEnvVars = new RegExp(`(?<=${name}_ENV_).*$`);
             const middlewareConf = {
-                name: `${name}${tooling}`,
+                name: `${name}${tooling ? tooling : ""}`,
                 afterMiddleware: "compression",
                 configuration: {}
             };

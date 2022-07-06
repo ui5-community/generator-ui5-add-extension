@@ -1,7 +1,7 @@
 {
-  "name": "generator-add-ui5-tooling",
+  "name": "generator-ui5-add",
   "version": "0.0.1",
-  "description": "A generator for adding UI5 tooling extensions",
+  "description": "A Yeoman generator to easily add assets to your UI5 project",
   "homepage": "",
   "author": {
     "name": "Jakob Kjaer",
@@ -38,11 +38,9 @@
     "npm": ">= 4.0.0"
   },
   "dependencies": {
-    "bottom-bar": "^1.0.3",
     "chalk": "^4.1.2",
     "envfile": "^6.17.0",
     "js-yaml": "^4.1.0",
-    "terminal-link": "^3.0.0",
     "write-yaml": "^1.0.0",
     "yeoman-generator": "^5.0.0",
     "yosay": "^2.0.2"
@@ -89,6 +87,6 @@
     "pretest": "eslint .",
     "test": "jest"
   },
-  "repository": "uxkjaer/generator-add-ui-5-tooling",
+  "repository": "ui5-community/generator-ui5-add",
   "license": "Apache-2.0"
 }
