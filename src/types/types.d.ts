@@ -4,6 +4,12 @@ interface IGitRepo {
   directory: string;
 }
 
+interface IExtensionOrder {
+  type: string;
+  index: number;
+  name: string;
+}
+
 interface IPackage {
   name: string;
   version: string;

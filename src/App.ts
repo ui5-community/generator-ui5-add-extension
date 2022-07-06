@@ -5,6 +5,8 @@ import yosay from "yosay";
 import axios from "axios";
 import { load, dump } from "js-yaml";
 import * as envFile from "envfile";
+
+
 interface IGitRepo {
   type: string;
   url: string;
@@ -35,6 +37,12 @@ interface extension {
     customTasks: any[];
   };
   customTasks?: any[];
+}
+interface promptResponse {
+  ExtensionMiddleware: string[]
+  ExtensionTooling: string[]
+  ExtensionType: String[]
+
 }
 interface ExtensionType { ExtensionType: string | string[]; }
 interface ui5Dependency {
@@ -74,12 +82,24 @@ interface IGeneratorOptions {
   when: boolean | Function;
   choices?: string[];
 }
+
+
+
 export class App extends Generator {
   [x: string]: any;
   props: any;
   ui5Yaml: IUi5Yaml;
+  currentWriteExt: string;
+  sortOrder: string[];
   public constructor(args: string[], opts: []) {
     super(args, opts);
+    this.sortOrder = [
+      'ui5-tooling-modules',
+      'ui5-middleware-livereload',
+      'ui5-middleware-onelogin',
+      'ui5-middleware-simpleproxy'
+
+    ]
   }
   public async initializing() {
     const data =
@@ -112,6 +132,7 @@ export class App extends Generator {
         return `${ui5Ext.name} - ${ui5Ext.description}`;
       });
   }
+
 
   public async prompting() {
     // Have Yeoman greet the user.
@@ -154,21 +175,23 @@ export class App extends Generator {
       this.log("Coulnd't find a .env file");
       this.envFile = {};
     }
-
+    let devDeps: string[] = []
     let ui5Deps: ui5Dependency = this.packageJson.get("ui5")
     if (this.props.ExtensionsMiddleware) {
       this.props.ExtensionsMiddleware.forEach(async (ui5Ext: string) => {
+        
         const name = ui5Ext.match(regName)![0];
-
-        await this.promMiddleware(name);
+        const npmPackage : IPackage = this.packages.find(
+          (ui5Ext1: { name: string }) => ui5Ext1.name === name
+        );
+        await this._promMiddleware(name);
 
         let dependency = {} as any;
         if (!ui5Deps.dependencies.find(dep => dep === name)) {
           ui5Deps.dependencies.push(name)
-          this.packageJson.save()
         }
-        dependency[name] = "latest";
-        await this.addDevDependencies(dependency);
+        dependency[name] = `^${npmPackage.version}`;
+        await this.addDevDependencies(dependency)
       });
     }
 
@@ -177,15 +200,19 @@ export class App extends Generator {
     if (this.props.ExtensionsTasks) {
       this.props.ExtensionsTasks.forEach(async (ui5Ext: string) => {
         const name = ui5Ext.match(regName)![0];
-
-        await this.promTasks(name);
+        const npmPackage : IPackage = this.packages.find(
+          (ui5Ext1: { name: string }) => ui5Ext1.name === name
+        );
+        await this._promTasks(name);
 
         let dependency = {} as any;
-        dependency[name] = "latest";
+        dependency[name] = `^${npmPackage.version}`;
+        await this.addDevDependencies(dependency)
+
         if (!ui5Deps.dependencies.find(dep => dep === name)) {
           ui5Deps.dependencies.push(name)
-          this.packageJson.save()
-        } await this.addDevDependencies(dependency);
+        }
+
       });
     }
 
@@ -193,19 +220,29 @@ export class App extends Generator {
 
       this.props.ExtensionsTooling.forEach(async (ui5Ext: string) => {
         const name = ui5Ext.match(regName)![0];
-
-        await this.promTooling(name);
+        const npmPackage : IPackage = this.packages.find(
+          (ui5Ext1: { name: string }) => ui5Ext1.name === name
+        );
+        await this._promTooling(name);
 
         let dependency = {} as any;
         if (!ui5Deps.dependencies.find(dep => dep === name)) {
           ui5Deps.dependencies.push(name)
-          this.packageJson.save()
         }
-        dependency[name] = "latest";
-        await this.addDevDependencies(dependency);
+        dependency[name] = `^${npmPackage.version}`;
+        await this.addDevDependencies(dependency)
       });
     }
-
+    
+    if (this.ui5Yaml.server) {
+      this.ui5Yaml.server.customMiddleware = this.ui5Yaml.server.customMiddleware?.sort((a, b) => this.sortOrder.indexOf(a.name) - this.sortOrder.indexOf(b.name)).map((middleware, index, middlewares) => {
+        if (index > 0) {
+          const prevMiddleware = middlewares[index - 1];
+          middleware.afterMiddleware = prevMiddleware.name
+        }
+        return middleware
+      })
+    }
     const newYaml = dump(this.ui5Yaml);
     this.fs.write(this.destinationPath("ui5.yaml"), newYaml);
     if (this.envFile) {
@@ -217,6 +254,7 @@ export class App extends Generator {
   }
 
   private _getExtensions() {
+
     let prompts = [
       {
         type: "checkbox",
@@ -257,7 +295,8 @@ export class App extends Generator {
     this.middlewares.forEach((ui5Ext: string) => {
       const newVarPrompt: Array<Generator.Question> | undefined = this._addVariables(
         ui5Ext,
-        "middleware"
+        "middleware",
+        false
       );
       if (newVarPrompt) {
         newVarPrompt.forEach((prompt: any) => {
@@ -269,7 +308,8 @@ export class App extends Generator {
     this.tasks.forEach((ui5Ext: string) => {
       const newVarPrompt: Array<Generator.Question> | undefined = this._addVariables(
         ui5Ext,
-        "tasks"
+        "tasks",
+        false
       );
       if (newVarPrompt) {
         newVarPrompt.forEach((prompt: any) => {
@@ -280,7 +320,8 @@ export class App extends Generator {
     this.tooling.forEach((ui5Ext: string) => {
       const newVarMidPrompt: Array<Generator.Question> | undefined = this._addVariables(
         ui5Ext,
-        "middleware"
+        "middleware",
+        true
       );
       if (newVarMidPrompt) {
         newVarMidPrompt.forEach((prompt: any) => {
@@ -290,7 +331,8 @@ export class App extends Generator {
 
       const newVarTaskPrompt: Array<Generator.Question> | undefined = this._addVariables(
         ui5Ext,
-        "task"
+        "task",
+        true
       );
       if (newVarTaskPrompt) {
         newVarTaskPrompt.forEach((prompt: any) => {
@@ -306,7 +348,7 @@ export class App extends Generator {
     });
   }
 
-  private _addVariables(ui5Package: string, type: string): Generator.Question[] | undefined {
+  private _addVariables(ui5Package: string, type: string, isTooling: boolean): Generator.Question[] | undefined {
     const ui5Ext = this.packages.find(
       (ui5Ext1: { name: string }) => ui5Ext1.name === ui5Package.split(" - ")[0]
     );
@@ -322,13 +364,25 @@ export class App extends Generator {
           name: param.env
             ? `${ui5Ext.name}_ENV_${param.env}`
             : `${ui5Ext.name}_${param.name}`,
-          message: `Add variable '${param.name}' for ${ui5Ext.name}`,
+          message: `Set '${param.name}' - ${param.description}`,
           store: true,
-          when: (response: ExtensionType) => {
+          when: (response: Partial<promptResponse>) => {
             try {
-              return response[`Extensions${response.ExtensionType[0]}` as keyof ExtensionType].includes(
-                `${ui5Ext.name} - ${ui5Ext.description}`
-              )
+
+              let isFound = response.ExtensionType!.filter(extType =>
+                response[`Extensions${extType}` as keyof ExtensionType]!.includes(
+                  `${ui5Ext.name} - ${ui5Ext.description}`
+
+                )).length > 0
+
+              if (ui5Ext.name !== this.currentWriteExt && isFound) {
+
+                this.currentWriteExt = ui5Ext.name;
+
+                this.log(`Set your variables for ${chalk.blueBright(this._termilink(ui5Ext.name, ui5Ext.githublink))}`)
+              }
+
+              return isFound
             }
             catch (e) {
               return false
@@ -346,11 +400,14 @@ export class App extends Generator {
           name: `${ui5Ext.name}_ENV`,
           message: `Do you want to store the environment variables for ${ui5Ext.name}?`,
           store: true,
-          when: (response: { ExtensionsMiddleware: string | string[] }) => {
+          when: (response: Partial<promptResponse>) => {
             try {
-              response.ExtensionsMiddleware.includes(
-                `${ui5Ext.name} - ${ui5Ext.description}`
-              )
+              return response.ExtensionType!.filter(extType =>
+                response[`Extensions${extType}` as keyof ExtensionType]!.includes(
+                  `${ui5Ext.name} - ${ui5Ext.description}`
+
+                )).length > 0
+
             }
             catch (e) {
               return false
@@ -358,18 +415,20 @@ export class App extends Generator {
           }
         });
       }
-      if (ui5Ext.jsdoc[type] === 'tooling') {
+      if (isTooling) {
         prompts.push({
-          type: "choice",
+          type: "checkbox",
           name: `${ui5Ext.name}_extensions`,
           message: `How do you want to use this tooling extension?`,
           store: true,
           choices: ["Middleware", "Task"],
-          when: (response: { ExtensionsMiddleware: string | string[] }) => {
+          when: (response: Partial<promptResponse>) => {
             try {
-              response.ExtensionsMiddleware.includes(
-                `${ui5Ext.name} - ${ui5Ext.description}`
-              )
+              return response.ExtensionType!.filter(extType =>
+                response[`Extensions${extType}` as keyof ExtensionType]!.includes(
+                  `${ui5Ext.name} - ${ui5Ext.description}`
+
+                )).length > 0
             }
             catch (e) {
               return false
@@ -383,11 +442,11 @@ export class App extends Generator {
     }
   }
 
-  private promTooling(ui5Ext: string): Promise<void> {
+  private _promTooling(ui5Ext: string): Promise<void> {
     try {
       const name = ui5Ext
-      this.props[`${name}_extensions`].forEach((extension: string) => {
-        extension === "Middleware" ? this.promMiddleware(name) : this.promTask(name);
+      this.props[`${name}_extensions`].forEach(async (extension: string) => {
+        extension === "Middleware" ? await this._promMiddleware(name, "-middleware") : await this._promTask(name, "-task");
       });
       return Promise.resolve();
     }
@@ -396,7 +455,7 @@ export class App extends Generator {
     }
   }
 
-  private promMiddleware(ui5Ext: string): Promise<void> {
+  private _promMiddleware(ui5Ext: string, tooling? :string ): Promise<void> {
     try {
 
       const name = ui5Ext
@@ -407,14 +466,17 @@ export class App extends Generator {
         };
       }
 
+     
+
+      const regVars = new RegExp(`(?<=${name}_)(?!.*ENV).*$`);
+      const regEnvVars = new RegExp(`(?<=${name}_ENV_).*$`);
+
       const middlewareConf: any = {
-        name: name,
+        name: `${name}${tooling}`,
         afterMiddleware: "compression",
         configuration: {}
       };
 
-      const regVars = new RegExp(`(?<=${name}_)(?!.*ENV).*$`);
-      const regEnvVars = new RegExp(`(?<=${name}_ENV_).*$`);
       const vars = Object.keys(this.props).filter((prop: string) =>
         prop.match(regVars)
       );
@@ -422,13 +484,29 @@ export class App extends Generator {
         prop.match(regEnvVars)
       );
       vars?.forEach((varName: string) => {
-        middlewareConf.configuration[regVars.exec(varName)![0]] = this.props[
+        if (this.props[
           varName
-        ];
+        ]) {
+          if (regVars.exec(varName)![0] === "mountPath"){
+            middlewareConf[regVars.exec(varName)![0]] = this.props[
+              varName
+            ];
+          }
+          else {
+          middlewareConf.configuration[regVars.exec(varName)![0]] = this.props[
+            varName
+          ];
+        }
+        }
       });
       EnvVars?.forEach((varName: string) => {
-        this.envFile[regEnvVars.exec(varName)![0]] = this.props[varName];
+        if (this.props[
+          varName
+        ]) {
+          this.envFile[regEnvVars.exec(varName)![0]] = this.props[varName];
+        }
       });
+
 
       if (this.ui5Yaml.server.customMiddleware?.find(middleware => middleware.name === middlewareConf.name)) {
         let middlewareIndex = this.ui5Yaml.server.customMiddleware?.findIndex(middleware => middleware.name === middlewareConf.name)
@@ -448,7 +526,7 @@ export class App extends Generator {
     }
   }
 
-  private promTasks(ui5Ext: string): Promise<void> {
+  private _promTasks(ui5Ext: string): Promise<void> {
     try {
       const name = ui5Ext
 
@@ -483,5 +561,13 @@ export class App extends Generator {
     catch {
       return Promise.resolve()
     }
+  }
+
+  private _termilink(text: string, url: string): string {
+    const OSC = '\u001B]';
+    const BEL = '\u0007';
+    const SEP = ';';
+
+    return [OSC, '8', SEP, SEP, url, BEL, text, OSC, '8', SEP, SEP, BEL].join('');
   }
 }

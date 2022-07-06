@@ -10,7 +10,10 @@
     "strictNullChecks": true,
     "target": "es2017",
     "outDir": "./generators/app",
-    "esModuleInterop": true
+    "rootDir": "src",
+    "esModuleInterop": true,
+    "typeRoots": [ "src/types", "./node_modules/@types"]
+
   },
   "exclude": [
     "dist",

@@ -36,6 +36,12 @@ const envFile = __importStar(require("envfile"));
 class App extends Generator {
     constructor(args, opts) {
         super(args, opts);
+        this.sortOrder = [
+            'ui5-tooling-modules',
+            'ui5-middleware-livereload',
+            'ui5-middleware-onelogin',
+            'ui5-middleware-simpleproxy'
+        ];
     }
     async initializing() {
         const data = process.env.debugGenerator === "true"
@@ -69,6 +75,7 @@ class App extends Generator {
         return this._getExtensions();
     }
     async writing() {
+        var _a;
         // this.fs.copy(
         //   this.templatePath("dummyfile.txt"),
         //   this.destinationPath("dummyfile.txt")
@@ -89,44 +96,54 @@ class App extends Generator {
             this.log("Coulnd't find a .env file");
             this.envFile = {};
         }
+        let devDeps = [];
         let ui5Deps = this.packageJson.get("ui5");
         if (this.props.ExtensionsMiddleware) {
             this.props.ExtensionsMiddleware.forEach(async (ui5Ext) => {
                 const name = ui5Ext.match(regName)[0];
-                await this.promMiddleware(name);
+                const npmPackage = this.packages.find((ui5Ext1) => ui5Ext1.name === name);
+                await this._promMiddleware(name);
                 let dependency = {};
                 if (!ui5Deps.dependencies.find(dep => dep === name)) {
                     ui5Deps.dependencies.push(name);
-                    this.packageJson.save();
                 }
-                dependency[name] = "latest";
+                dependency[name] = `^${npmPackage.version}`;
                 await this.addDevDependencies(dependency);
             });
         }
         if (this.props.ExtensionsTasks) {
             this.props.ExtensionsTasks.forEach(async (ui5Ext) => {
                 const name = ui5Ext.match(regName)[0];
-                await this.promTasks(name);
+                const npmPackage = this.packages.find((ui5Ext1) => ui5Ext1.name === name);
+                await this._promTasks(name);
                 let dependency = {};
-                dependency[name] = "latest";
+                dependency[name] = `^${npmPackage.version}`;
+                await this.addDevDependencies(dependency);
                 if (!ui5Deps.dependencies.find(dep => dep === name)) {
                     ui5Deps.dependencies.push(name);
-                    this.packageJson.save();
                 }
-                await this.addDevDependencies(dependency);
             });
         }
         if (this.props.ExtensionsTooling) {
             this.props.ExtensionsTooling.forEach(async (ui5Ext) => {
                 const name = ui5Ext.match(regName)[0];
-                await this.promTooling(name);
+                const npmPackage = this.packages.find((ui5Ext1) => ui5Ext1.name === name);
+                await this._promTooling(name);
                 let dependency = {};
                 if (!ui5Deps.dependencies.find(dep => dep === name)) {
                     ui5Deps.dependencies.push(name);
-                    this.packageJson.save();
                 }
-                dependency[name] = "latest";
+                dependency[name] = `^${npmPackage.version}`;
                 await this.addDevDependencies(dependency);
+            });
+        }
+        if (this.ui5Yaml.server) {
+            this.ui5Yaml.server.customMiddleware = (_a = this.ui5Yaml.server.customMiddleware) === null || _a === void 0 ? void 0 : _a.sort((a, b) => this.sortOrder.indexOf(a.name) - this.sortOrder.indexOf(b.name)).map((middleware, index, middlewares) => {
+                if (index > 0) {
+                    const prevMiddleware = middlewares[index - 1];
+                    middleware.afterMiddleware = prevMiddleware.name;
+                }
+                return middleware;
             });
         }
         const newYaml = (0, js_yaml_1.dump)(this.ui5Yaml);
@@ -171,7 +188,7 @@ class App extends Generator {
             },
         ];
         this.middlewares.forEach((ui5Ext) => {
-            const newVarPrompt = this._addVariables(ui5Ext, "middleware");
+            const newVarPrompt = this._addVariables(ui5Ext, "middleware", false);
             if (newVarPrompt) {
                 newVarPrompt.forEach((prompt) => {
                     prompts.push(prompt);
@@ -179,7 +196,7 @@ class App extends Generator {
             }
         });
         this.tasks.forEach((ui5Ext) => {
-            const newVarPrompt = this._addVariables(ui5Ext, "tasks");
+            const newVarPrompt = this._addVariables(ui5Ext, "tasks", false);
             if (newVarPrompt) {
                 newVarPrompt.forEach((prompt) => {
                     prompts.push(prompt);
@@ -187,13 +204,13 @@ class App extends Generator {
             }
         });
         this.tooling.forEach((ui5Ext) => {
-            const newVarMidPrompt = this._addVariables(ui5Ext, "middleware");
+            const newVarMidPrompt = this._addVariables(ui5Ext, "middleware", true);
             if (newVarMidPrompt) {
                 newVarMidPrompt.forEach((prompt) => {
                     prompts.push(prompt);
                 });
             }
-            const newVarTaskPrompt = this._addVariables(ui5Ext, "task");
+            const newVarTaskPrompt = this._addVariables(ui5Ext, "task", true);
             if (newVarTaskPrompt) {
                 newVarTaskPrompt.forEach((prompt) => {
                     prompts.push(prompt);
@@ -205,7 +222,7 @@ class App extends Generator {
             this.props = props;
         });
     }
-    _addVariables(ui5Package, type) {
+    _addVariables(ui5Package, type, isTooling) {
         const ui5Ext = this.packages.find((ui5Ext1) => ui5Ext1.name === ui5Package.split(" - ")[0]);
         if (ui5Ext.jsdoc[type]) {
             let askForEnv = false;
@@ -218,11 +235,16 @@ class App extends Generator {
                     name: param.env
                         ? `${ui5Ext.name}_ENV_${param.env}`
                         : `${ui5Ext.name}_${param.name}`,
-                    message: `Add variable '${param.name}' for ${ui5Ext.name}`,
+                    message: `Set '${param.name}' - ${param.description}`,
                     store: true,
                     when: (response) => {
                         try {
-                            return response[`Extensions${response.ExtensionType[0]}`].includes(`${ui5Ext.name} - ${ui5Ext.description}`);
+                            let isFound = response.ExtensionType.filter(extType => response[`Extensions${extType}`].includes(`${ui5Ext.name} - ${ui5Ext.description}`)).length > 0;
+                            if (ui5Ext.name !== this.currentWriteExt && isFound) {
+                                this.currentWriteExt = ui5Ext.name;
+                                this.log(`Set your variables for ${chalk_1.default.blueBright(this._termilink(ui5Ext.name, ui5Ext.githublink))}`);
+                            }
+                            return isFound;
                         }
                         catch (e) {
                             return false;
@@ -242,7 +264,7 @@ class App extends Generator {
                     store: true,
                     when: (response) => {
                         try {
-                            response.ExtensionsMiddleware.includes(`${ui5Ext.name} - ${ui5Ext.description}`);
+                            return response.ExtensionType.filter(extType => response[`Extensions${extType}`].includes(`${ui5Ext.name} - ${ui5Ext.description}`)).length > 0;
                         }
                         catch (e) {
                             return false;
@@ -250,16 +272,16 @@ class App extends Generator {
                     }
                 });
             }
-            if (ui5Ext.jsdoc[type] === 'tooling') {
+            if (isTooling) {
                 prompts.push({
-                    type: "choice",
+                    type: "checkbox",
                     name: `${ui5Ext.name}_extensions`,
                     message: `How do you want to use this tooling extension?`,
                     store: true,
                     choices: ["Middleware", "Task"],
                     when: (response) => {
                         try {
-                            response.ExtensionsMiddleware.includes(`${ui5Ext.name} - ${ui5Ext.description}`);
+                            return response.ExtensionType.filter(extType => response[`Extensions${extType}`].includes(`${ui5Ext.name} - ${ui5Ext.description}`)).length > 0;
                         }
                         catch (e) {
                             return false;
@@ -273,11 +295,11 @@ class App extends Generator {
             return;
         }
     }
-    promTooling(ui5Ext) {
+    _promTooling(ui5Ext) {
         try {
             const name = ui5Ext;
-            this.props[`${name}_extensions`].forEach((extension) => {
-                extension === "Middleware" ? this.promMiddleware(name) : this.promTask(name);
+            this.props[`${name}_extensions`].forEach(async (extension) => {
+                extension === "Middleware" ? await this._promMiddleware(name, "-middleware") : await this._promTask(name, "-task");
             });
             return Promise.resolve();
         }
@@ -285,7 +307,7 @@ class App extends Generator {
             return Promise.resolve();
         }
     }
-    promMiddleware(ui5Ext) {
+    _promMiddleware(ui5Ext, tooling) {
         var _a, _b;
         try {
             const name = ui5Ext;
@@ -294,20 +316,29 @@ class App extends Generator {
                     customMiddleware: []
                 };
             }
+            const regVars = new RegExp(`(?<=${name}_)(?!.*ENV).*$`);
+            const regEnvVars = new RegExp(`(?<=${name}_ENV_).*$`);
             const middlewareConf = {
-                name: name,
+                name: `${name}${tooling}`,
                 afterMiddleware: "compression",
                 configuration: {}
             };
-            const regVars = new RegExp(`(?<=${name}_)(?!.*ENV).*$`);
-            const regEnvVars = new RegExp(`(?<=${name}_ENV_).*$`);
             const vars = Object.keys(this.props).filter((prop) => prop.match(regVars));
             const EnvVars = Object.keys(this.props).filter((prop) => prop.match(regEnvVars));
             vars === null || vars === void 0 ? void 0 : vars.forEach((varName) => {
-                middlewareConf.configuration[regVars.exec(varName)[0]] = this.props[varName];
+                if (this.props[varName]) {
+                    if (regVars.exec(varName)[0] === "mountPath") {
+                        middlewareConf[regVars.exec(varName)[0]] = this.props[varName];
+                    }
+                    else {
+                        middlewareConf.configuration[regVars.exec(varName)[0]] = this.props[varName];
+                    }
+                }
             });
             EnvVars === null || EnvVars === void 0 ? void 0 : EnvVars.forEach((varName) => {
-                this.envFile[regEnvVars.exec(varName)[0]] = this.props[varName];
+                if (this.props[varName]) {
+                    this.envFile[regEnvVars.exec(varName)[0]] = this.props[varName];
+                }
             });
             if ((_a = this.ui5Yaml.server.customMiddleware) === null || _a === void 0 ? void 0 : _a.find(middleware => middleware.name === middlewareConf.name)) {
                 let middlewareIndex = (_b = this.ui5Yaml.server.customMiddleware) === null || _b === void 0 ? void 0 : _b.findIndex(middleware => middleware.name === middlewareConf.name);
@@ -324,7 +355,7 @@ class App extends Generator {
             return Promise.resolve();
         }
     }
-    promTasks(ui5Ext) {
+    _promTasks(ui5Ext) {
         try {
             const name = ui5Ext;
             if (!this.ui5Yaml.builder) {
@@ -353,6 +384,12 @@ class App extends Generator {
         catch (_a) {
             return Promise.resolve();
         }
+    }
+    _termilink(text, url) {
+        const OSC = '\u001B]';
+        const BEL = '\u0007';
+        const SEP = ';';
+        return [OSC, '8', SEP, SEP, url, BEL, text, OSC, '8', SEP, SEP, BEL].join('');
     }
 }
 exports.App = App;
