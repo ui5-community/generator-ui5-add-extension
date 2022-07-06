@@ -34,6 +34,10 @@ const axios_1 = __importDefault(require("axios"));
 const js_yaml_1 = require("js-yaml");
 const envFile = __importStar(require("envfile"));
 class App extends Generator {
+    props;
+    ui5Yaml;
+    currentWriteExt;
+    sortOrder;
     constructor(args, opts) {
         super(args, opts);
         this.sortOrder = [
@@ -70,12 +74,11 @@ class App extends Generator {
     }
     async prompting() {
         // Have Yeoman greet the user.
-        this.log((0, yosay_1.default)(`Hello, let me help you get sorted with your ${chalk_1.default.red("ui5-tooling")}
+        this.log((0, yosay_1.default)(`H1232ello, let me help you get sorted with your ${chalk_1.default.red("ui5-tooling")}
           data is from ${chalk_1.default.green("https://bestofui5.org")}`));
         return this._getExtensions();
     }
     async writing() {
-        var _a;
         // this.fs.copy(
         //   this.templatePath("dummyfile.txt"),
         //   this.destinationPath("dummyfile.txt")
@@ -138,7 +141,7 @@ class App extends Generator {
             });
         }
         if (this.ui5Yaml.server) {
-            this.ui5Yaml.server.customMiddleware = (_a = this.ui5Yaml.server.customMiddleware) === null || _a === void 0 ? void 0 : _a.sort((a, b) => this.sortOrder.indexOf(a.name) - this.sortOrder.indexOf(b.name)).map((middleware, index, middlewares) => {
+            this.ui5Yaml.server.customMiddleware = this.ui5Yaml.server.customMiddleware?.sort((a, b) => this.sortOrder.indexOf(a.name) - this.sortOrder.indexOf(b.name)).map((middleware, index, middlewares) => {
                 if (index > 0) {
                     const prevMiddleware = middlewares[index - 1];
                     middleware.afterMiddleware = prevMiddleware.name;
@@ -303,12 +306,11 @@ class App extends Generator {
             });
             return Promise.resolve();
         }
-        catch (_a) {
+        catch {
             return Promise.resolve();
         }
     }
     _promMiddleware(ui5Ext, tooling) {
-        var _a, _b;
         try {
             const name = ui5Ext;
             if (!this.ui5Yaml.server) {
@@ -325,7 +327,7 @@ class App extends Generator {
             };
             const vars = Object.keys(this.props).filter((prop) => prop.match(regVars));
             const EnvVars = Object.keys(this.props).filter((prop) => prop.match(regEnvVars));
-            vars === null || vars === void 0 ? void 0 : vars.forEach((varName) => {
+            vars?.forEach((varName) => {
                 if (this.props[varName]) {
                     if (regVars.exec(varName)[0] === "mountPath") {
                         middlewareConf[regVars.exec(varName)[0]] = this.props[varName];
@@ -335,13 +337,13 @@ class App extends Generator {
                     }
                 }
             });
-            EnvVars === null || EnvVars === void 0 ? void 0 : EnvVars.forEach((varName) => {
+            EnvVars?.forEach((varName) => {
                 if (this.props[varName]) {
                     this.envFile[regEnvVars.exec(varName)[0]] = this.props[varName];
                 }
             });
-            if ((_a = this.ui5Yaml.server.customMiddleware) === null || _a === void 0 ? void 0 : _a.find(middleware => middleware.name === middlewareConf.name)) {
-                let middlewareIndex = (_b = this.ui5Yaml.server.customMiddleware) === null || _b === void 0 ? void 0 : _b.findIndex(middleware => middleware.name === middlewareConf.name);
+            if (this.ui5Yaml.server.customMiddleware?.find(middleware => middleware.name === middlewareConf.name)) {
+                let middlewareIndex = this.ui5Yaml.server.customMiddleware?.findIndex(middleware => middleware.name === middlewareConf.name);
                 this.log(chalk_1.default.yellow(`Overwriting existing configuration found for ${middlewareConf.name}, `));
                 this.ui5Yaml.server.customMiddleware[middlewareIndex] = middlewareConf;
             }
@@ -351,7 +353,7 @@ class App extends Generator {
             // Get all the middleware config params and add to the yaml file
             return Promise.resolve();
         }
-        catch (_c) {
+        catch {
             return Promise.resolve();
         }
     }
@@ -370,7 +372,7 @@ class App extends Generator {
             };
             const regVars = new RegExp(`(?<=${name}_).*$`);
             const vars = Object.keys(this.props).filter((prop) => prop.match(regVars));
-            vars === null || vars === void 0 ? void 0 : vars.forEach((varName) => {
+            vars?.forEach((varName) => {
                 taskConf.configuration[regVars.exec(varName)[0]] = this.props[varName];
             });
             if (taskConf) {
@@ -381,7 +383,7 @@ class App extends Generator {
             // Get all the tasks config params and add to the yaml file
             return Promise.resolve();
         }
-        catch (_a) {
+        catch {
             return Promise.resolve();
         }
     }

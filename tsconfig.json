@@ -1,24 +1,20 @@
 {
   "compilerOptions": {
-    "forceConsistentCasingInFileNames": true,
-    "lib": ["es2017"],
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "noImplicitAny": true,
-    "skipLibCheck": true,
-    "sourceMap": true,
-    "strictNullChecks": true,
-    "target": "es2017",
-    "outDir": "./generators/app",
-    "rootDir": "src",
     "esModuleInterop": true,
-    "typeRoots": [ "src/types", "./node_modules/@types"]
-
+    "target": "ESNext",
+    "module": "commonjs",
+    "outDir": "generators",
+    "rootDir": "src",
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true
   },
+  "include": [
+    "src"
+  ],
   "exclude": [
-    "dist",
-    "generators/app/templates",
     "node_modules",
-    "**/*.spec.ts"
+    "src/*/templates"
   ]
 }
+
