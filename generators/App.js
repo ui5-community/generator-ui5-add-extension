@@ -27,7 +27,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.App = void 0;
-const Generator = require("yeoman-generator");
+const Generator = require("yeoman-generator"); // HACK
 const chalk_1 = __importDefault(require("chalk"));
 const yosay_1 = __importDefault(require("yosay"));
 const axios_1 = __importDefault(require("axios"));
@@ -74,8 +74,10 @@ class App extends Generator {
     }
     async prompting() {
         // Have Yeoman greet the user.
-        this.log((0, yosay_1.default)(`Hello, let me help you get sorted with your ${chalk_1.default.red("ui5-tooling")}
-          data is from ${chalk_1.default.green("https://bestofui5.org")}`));
+        if (!this.options.embedded) {
+            this.log((0, yosay_1.default)(`Hello, let me help you get sorted with your ${chalk_1.default.red("ui5-tooling")}
+            data is from ${chalk_1.default.green("https://bestofui5.org")}`));
+        }
         return this._getExtensions();
     }
     async writing() {
@@ -302,7 +304,7 @@ class App extends Generator {
         try {
             const name = ui5Ext;
             this.props[`${name}_extensions`].forEach(async (extension) => {
-                extension === "Middleware" ? await this._promMiddleware(name, "-middleware") : await this._promTask(name, "-task");
+                extension === "Middleware" ? await this._promMiddleware(name, "-middleware") : await this._promTasks(name, "-task");
             });
             return Promise.resolve();
         }
@@ -357,7 +359,7 @@ class App extends Generator {
             return Promise.resolve();
         }
     }
-    _promTasks(ui5Ext) {
+    _promTasks(ui5Ext, tooling) {
         try {
             const name = ui5Ext;
             if (!this.ui5Yaml.builder) {
@@ -367,7 +369,7 @@ class App extends Generator {
             }
             const taskConf = {
                 name: name,
-                afterTasks: "replaceVersion",
+                afterTask: "replaceVersion",
                 configuration: {}
             };
             const regVars = new RegExp(`(?<=${name}_).*$`);

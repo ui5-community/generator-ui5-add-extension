@@ -1,5 +1,5 @@
 "use strict";
-import Generator = require("yeoman-generator");
+import Generator = require("yeoman-generator"); // HACK!
 import chalk from "chalk";
 import yosay from "yosay";
 import axios from "axios";
@@ -136,13 +136,15 @@ export class App extends Generator {
 
   public async prompting() {
     // Have Yeoman greet the user.
-    this.log(
-      yosay(
-        `Hello, let me help you get sorted with your ${chalk.red(
-          "ui5-tooling")}
-          data is from ${chalk.green("https://bestofui5.org")}`
-      )
-    );
+    if (!this.options.embedded) {
+      this.log(
+        yosay(
+          `Hello, let me help you get sorted with your ${chalk.red(
+            "ui5-tooling")}
+            data is from ${chalk.green("https://bestofui5.org")}`
+        )
+      );
+    }
 
     return this._getExtensions();
   }
@@ -179,7 +181,7 @@ export class App extends Generator {
     let ui5Deps: ui5Dependency = this.packageJson.get("ui5")
     if (this.props.ExtensionsMiddleware) {
       this.props.ExtensionsMiddleware.forEach(async (ui5Ext: string) => {
-        
+
         const name = ui5Ext.match(regName)![0];
         const npmPackage : IPackage = this.packages.find(
           (ui5Ext1: { name: string }) => ui5Ext1.name === name
@@ -233,7 +235,7 @@ export class App extends Generator {
         await this.addDevDependencies(dependency)
       });
     }
-    
+
     if (this.ui5Yaml.server) {
       this.ui5Yaml.server.customMiddleware = this.ui5Yaml.server.customMiddleware?.sort((a, b) => this.sortOrder.indexOf(a.name) - this.sortOrder.indexOf(b.name)).map((middleware, index, middlewares) => {
         if (index > 0) {
@@ -446,7 +448,7 @@ export class App extends Generator {
     try {
       const name = ui5Ext
       this.props[`${name}_extensions`].forEach(async (extension: string) => {
-        extension === "Middleware" ? await this._promMiddleware(name, "-middleware") : await this._promTask(name, "-task");
+        extension === "Middleware" ? await this._promMiddleware(name, "-middleware") : await this._promTasks(name, "-task");
       });
       return Promise.resolve();
     }
@@ -466,7 +468,7 @@ export class App extends Generator {
         };
       }
 
-     
+
 
       const regVars = new RegExp(`(?<=${name}_)(?!.*ENV).*$`);
       const regEnvVars = new RegExp(`(?<=${name}_ENV_).*$`);
@@ -526,7 +528,7 @@ export class App extends Generator {
     }
   }
 
-  private _promTasks(ui5Ext: string): Promise<void> {
+  private _promTasks(ui5Ext: string, tooling? :string ): Promise<void> {
     try {
       const name = ui5Ext
 
@@ -537,7 +539,7 @@ export class App extends Generator {
       }
       const taskConf: any = {
         name: name,
-        afterTasks: "replaceVersion",
+        afterTask: "replaceVersion",
         configuration: {}
       };
       const regVars = new RegExp(`(?<=${name}_).*$`);
